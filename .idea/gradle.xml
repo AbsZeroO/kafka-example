@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="GradleMigrationSettings" migrationVersion="1" />
   <component name="GradleSettings">
     <option name="linkedExternalProjectsSettings">
       <GradleProjectSettings>
@@ -10,7 +11,7 @@
             <option value="$PROJECT_DIR$/notification-serwice" />
           </set>
         </option>
-        <option name="myGradleHome" value="$USER_HOME$/.sdkman/candidates/gradle/current" />
+        <option name="resolveExternalAnnotations" value="true" />
       </GradleProjectSettings>
       <GradleProjectSettings>
         <option name="distributionType" value="LOCAL" />
@@ -20,7 +21,6 @@
             <option value="$PROJECT_DIR$/order-service" />
           </set>
         </option>
-        <option name="myGradleHome" value="$USER_HOME$/.sdkman/candidates/gradle/current" />
       </GradleProjectSettings>
     </option>
   </component>
