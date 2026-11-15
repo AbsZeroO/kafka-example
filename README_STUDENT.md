@@ -221,33 +221,39 @@ spring.kafka.producer.properties.spring.json.add.type.headers=false
 
 Zamiast przesyłać domenową klasę `OrderEvent` bezpośrednio przez Kafkę, lepiej użyć **DTO (Data Transfer Object)**. DTO rozdziela to, co wysyłasz na zewnątrz (Kafka), od tego, co masz wewnątrz aplikacji.
 
-#### Nowa klasa DTO
+#### Klasa Mapper (OrderMapper)
 
-Utwórz plik `OrderDto.java` w obu serwisach:
+Mapper konwertuje między DTO (do Kafki) a domenową encją `OrderEvent` (wewnątrz aplikacji). Dzięki temu warstwa Kafka nie zna modelu domeny, a domena nie wie o Kafce.
 
-**order-service:** `src/main/java/org/example/orderservice/OrderDto.java`
-**notification-serwice:** `src/main/java/org/example/notificationservice/OrderDto.java`
+Utwórz plik `OrderMapper.java` w obu serwisach:
+
+**order-service:** `src/main/java/org/example/orderservice/OrderMapper.java`
+**notification-serwice:** `src/main/java/org/example/notificationservice/OrderMapper.java`
 
 ```java
-public class OrderDto {
-    private String orderId;
-    private String productName;
-    private Double price;
+package org.example.orderservice; // lub org.example.notificationservice
 
-    public OrderDto() {}
+import org.springframework.stereotype.Component;
 
-    public OrderDto(String orderId, String productName, Double price) {
-        this.orderId = orderId;
-        this.productName = productName;
-        this.price = price;
+@Component
+public class OrderMapper {
+
+    public OrderEvent toDomain(OrderDto dto) {
+        OrderEvent event = new OrderEvent();
+        event.setOrderId(dto.getOrderId());
+        event.setProductName(dto.getProductName());
+        event.setPrice(dto.getPrice());
+        event.setSchemaVersion(1);
+        return event;
     }
 
-    public String getOrderId() { return orderId; }
-    public void setOrderId(String orderId) { this.orderId = orderId; }
-    public String getProductName() { return productName; }
-    public void setProductName(String productName) { this.productName = productName; }
-    public Double getPrice() { return price; }
-    public void setPrice(Double price) { this.price = price; }
+    public OrderDto toDto(OrderEvent event) {
+        OrderDto dto = new OrderDto();
+        dto.setOrderId(event.getOrderId());
+        dto.setProductName(event.getProductName());
+        dto.setPrice(event.getPrice());
+        return dto;
+    }
 }
 ```
 
@@ -272,9 +278,15 @@ import java.util.UUID;
 public class OrderController {
 
     private final KafkaTemplate<String, OrderDto> kafkaTemplate;
+    private final OrderMapper orderMapper;
+    private final KafkaTransactionManager<String, OrderDto> transactionManager;
 
-    public OrderController(KafkaTemplate<String, OrderDto> kafkaTemplate) {
+    public OrderController(KafkaTemplate<String, OrderDto> kafkaTemplate,
+                           OrderMapper orderMapper,
+                           KafkaTransactionManager<String, OrderDto> transactionManager) {
         this.kafkaTemplate = kafkaTemplate;
+        this.orderMapper = orderMapper;
+        this.transactionManager = transactionManager;
     }
 
     @PostMapping
@@ -284,11 +296,14 @@ public class OrderController {
             orderDto.setOrderId(UUID.randomUUID().toString());
         }
 
+        OrderEvent orderEvent = orderMapper.toDomain(orderDto);
+
         String correlationId = UUID.randomUUID().toString();
         ProducerRecord<String, OrderDto> record =
                 new ProducerRecord<>("orders-topic", orderDto.getOrderId(), orderDto);
         record.headers().add("X-Correlation-Id", correlationId.getBytes());
 
+        System.out.println("Otrzymano żądanie HTTP. Przetwarzanie zamówienia: " + orderEvent.getProductName());
         kafkaTemplate.send(record);
 
         return ResponseEntity.ok()
@@ -299,20 +314,15 @@ public class OrderController {
 
 #### Konfiguracja menedżera transakcji Kafka
 
-Dodaj bean `KafkaTransactionManager` w order-service (np. nowy plik `KafkaConfig.java`):
+Dodaj bean `KafkaTransactionManager` w order-service (nowy plik `KafkaConfig.java`):
 
 ```java
 package org.example.orderservice;
 
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.KafkaTransactionManager;
 import org.springframework.kafka.core.ProducerFactory;
-import org.springframework.kafka.transaction.KafkaTransactionManager;
-
-import java.util.HashMap;
-import java.util.Map;
 
 @Configuration
 public class KafkaConfig {
@@ -334,6 +344,7 @@ spring.kafka.producer.properties.enable.idempotence=true
 
 **Co warto omówić na żywo:**
 * **DTO** – klasa tylko do przesyłania danych, bez logiki biznesowej. Dzięki niej zmiana w domenie nie wymusza zmiany formatu wiadomości w Kafce.
+* **Mapper** – konwertuje między DTO a domeną. Rozdziela warstwę transportu (Kafka) od logiki biznesowej.
 * **`@Transactional`** + `KafkaTransactionManager` – wysyłka do Kafki w transakcji. Albo wszystko się uda, albo nic (rollback).
 * **Idempotencja** (`enable.idempotence=true`) – Kafka nie dostarczy tego samego komunikatu dwa razy, nawet jeśli producent ponownie wyśle po awarii sieci.
 
@@ -354,8 +365,17 @@ import org.springframework.stereotype.Service;
 @Service
 public class NotificationListener {
 
+    private final OrderMapper orderMapper;
+
+    public NotificationListener(OrderMapper orderMapper) {
+        this.orderMapper = orderMapper;
+    }
+
     @KafkaListener(topics = "orders-topic", groupId = "notification-group")
     public void consumeOrder(ConsumerRecord<String, OrderDto> record, Acknowledgment ack) {
+        OrderDto dto = record.value();
+        OrderEvent orderEvent = orderMapper.toDomain(dto);
+
         System.out.println("-------------------------------------------------");
         System.out.println("Odebrano wiadomość z Kafki!");
         System.out.println("Temat: " + record.topic());
@@ -363,8 +383,8 @@ public class NotificationListener {
         System.out.println("Offset: " + record.offset());
         System.out.println("Klucz: " + record.key());
         System.out.println("Wysyłam email potwierdzający dla klienta...");
-        System.out.println("Zamówiono produkt: " + record.value().getProductName());
-        System.out.println("Kwota: " + record.value().getPrice() + " PLN");
+        System.out.println("Zamówiono produkt: " + orderEvent.getProductName());
+        System.out.println("Kwota: " + orderEvent.getPrice() + " PLN");
         System.out.println("-------------------------------------------------");
 
         ack.acknowledge();
@@ -405,10 +425,17 @@ import org.springframework.stereotype.Service;
 @Service
 public class AnalyticsListener {
 
+    private final OrderMapper orderMapper;
+
+    public AnalyticsListener(OrderMapper orderMapper) {
+        this.orderMapper = orderMapper;
+    }
+
     @KafkaListener(topics = "orders-topic", groupId = "analytics-group")
     public void consumeOrder(OrderDto orderDto) {
-        System.out.println("[analytics] Zamówienie: " + orderDto.getProductName()
-                + " kwota=" + orderDto.getPrice());
+        OrderEvent orderEvent = orderMapper.toDomain(orderDto);
+        System.out.println("[analytics] Zamówienie: " + orderEvent.getProductName()
+                + " kwota=" + orderEvent.getPrice());
     }
 }
 ```
