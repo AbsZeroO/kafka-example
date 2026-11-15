@@ -1,4 +1,4 @@
-# Kafka – Laboratorium dla Studentów
+# Kafka
 
 Projekt demonstruje komunikację między dwoma mikrousługami Spring Boot przez Apache Kafka:
 * **order-service** (port 8081) – producent, przyjmuje zamówienie przez REST i wrzuca je do Kafki.
