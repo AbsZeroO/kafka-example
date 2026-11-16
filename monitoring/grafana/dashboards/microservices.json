@@ -48,7 +48,7 @@
       },
       "gridPos": {
         "h": 5,
-        "w": 12,
+        "w": 8,
         "x": 0,
         "y": 0
       },
@@ -70,6 +70,92 @@
       },
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "DOWN"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "UP"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "id": 2,
+      "title": "Dostępność eksportera Kafka",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "up{job=\"kafka\"}",
+          "legendFormat": "kafka-exporter",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "id": 3,
+      "title": "Liczba brokerów",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "kafka_brokers",
+          "legendFormat": "brokerów",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
           "unit": "reqps"
         },
         "overrides": []
@@ -77,10 +163,10 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 0
+        "x": 0,
+        "y": 5
       },
-      "id": 2,
+      "id": 4,
       "title": "Żądania HTTP na sekundę",
       "type": "timeseries",
       "targets": [
@@ -105,10 +191,10 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 8
+        "x": 12,
+        "y": 5
       },
-      "id": 3,
+      "id": 5,
       "title": "Czas odpowiedzi HTTP (p95)",
       "type": "timeseries",
       "targets": [
@@ -124,9 +210,109 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 13
+      },
+      "id": 6,
+      "title": "Liczba partycji",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(kafka_topic_partitions)",
+          "legendFormat": "partycji",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 13
+      },
+      "id": 7,
+      "title": "Wiadomości w topicach",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(kafka_topic_partition_current_offset{topic!~\"__.*\"} - kafka_topic_partition_oldest_offset{topic!~\"__.*\"})",
+          "legendFormat": "wiadomości",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 13
+      },
+      "id": 8,
+      "title": "Pamięć JVM",
+      "type": "timeseries",
       "fieldConfig": {
         "defaults": {
           "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (application) (jvm_memory_used_bytes{area=\"heap\"})",
+          "legendFormat": "{{application}} heap",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "id": 9,
+      "title": "Consumer lag",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (consumergroup) (kafka_consumergroup_lag_sum)",
+          "legendFormat": "{{consumergroup}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
         },
         "overrides": []
       },
@@ -134,16 +320,21 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 8
+        "y": 18
       },
-      "id": 4,
-      "title": "Pamięć JVM",
+      "id": 10,
+      "title": "Replikacja i ISR",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum by (application) (jvm_memory_used_bytes{area=\"heap\"})",
-          "legendFormat": "{{application}} heap",
+          "expr": "sum by (topic) (kafka_topic_partition_replicas)",
+          "legendFormat": "{{topic}} repliki",
           "refId": "A"
+        },
+        {
+          "expr": "sum by (topic) (kafka_topic_partition_in_sync_replica)",
+          "legendFormat": "{{topic}} ISR",
+          "refId": "B"
         }
       ]
     }
@@ -161,7 +352,7 @@
     "from": "now-15m",
     "to": "now"
   },
-  "title": "Kafka Example - mikroserwisy",
+  "title": "Kafka Example - mikroserwisy i Kafka",
   "uid": "kafka-example-microservices",
-  "version": 1
+  "version": 2
 }

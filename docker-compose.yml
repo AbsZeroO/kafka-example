@@ -63,6 +63,24 @@ services:
       - kafka2
       - kafka3
 
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.11.0
+    container_name: kafka-exporter
+    ports:
+      - "9308:9308"
+    networks:
+      - kafka-net
+    command:
+      - "--kafka.server=kafka1:9092"
+      - "--kafka.server=kafka2:9092"
+      - "--kafka.server=kafka3:9092"
+      - "--web.listen-address=:9308"
+      - "--offset.show-all"
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+
   prometheus:
     image: prom/prometheus:v3.7.3
     container_name: prometheus
@@ -78,6 +96,7 @@ services:
       - kafka1
       - kafka2
       - kafka3
+      - kafka-exporter
 
   grafana:
     image: grafana/grafana:12.2.0
