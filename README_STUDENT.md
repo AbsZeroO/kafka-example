@@ -115,6 +115,98 @@ curl -X POST http://localhost:8081/api/orders \
 
 W konsoli `notification-serwice` powinny pojawić się logi z obu konsumentów.
 
+### Krok 5 – Monitoring: Grafana i Prometheus
+
+Po uruchomieniu wszystkich kontenerów i obu mikroserwisów monitoring jest dostępny pod adresami:
+
+* **Grafana:** http://localhost:3000
+  * login: `admin`
+  * hasło: `admin`
+  * dashboard **Kafka Example - mikroserwisy i Kafka** jest załadowany automatycznie.
+* **Prometheus:** http://localhost:9091
+  * zapytania można sprawdzać w zakładce **Graph**.
+
+Prometheus pobiera metryki mikroserwisów z endpointów:
+
+* http://localhost:8081/actuator/prometheus
+* http://localhost:8082/actuator/prometheus
+
+Eksporter Kafki udostępnia metryki pod adresem http://localhost:9308/metrics.
+
+#### Wysłanie pięciu zamówień
+
+Poniższa pętla wysyła od razu pięć niezależnych żądań do `order-service`:
+
+```bash
+for i in {1..5}; do
+  curl -s -X POST http://localhost:8081/api/orders \
+    -H "Content-Type: application/json" \
+    -d "{\"productName\":\"Laptop-$i\",\"price\":$((1000 + i * 100))}"
+  echo
+done
+```
+
+#### Podstawowe zapytania PromQL
+
+Zapytania można wkleić w Prometheusie (`http://localhost:9091`) albo użyć ich jako wyrażeń paneli w Grafanie:
+
+
+#### Czy mikroserwisy i eksporter Kafki są dostępne? 1 = UP, 0 = DOWN
+```promql
+up
+```
+
+#### Stan obu mikroserwisów
+```promql
+up{job=~"order-service|notification-service"}
+```
+
+#### Liczba żądań HTTP - wszystkie żądania:
+```promql
+http_server_requests_seconds_count
+```
+
+#### Liczba brokerów Kafki
+```promql
+kafka_brokers
+```
+
+#### Liczba wiadomości we wszystkich topicach (bez topiców systemowych)
+```promql
+sum(
+  kafka_topic_partition_current_offset{topic!~"__.*"}
+  - kafka_topic_partition_oldest_offset{topic!~"__.*"}
+)
+```
+
+#### Łączny consumer lag według grupy konsumentów
+```promql
+sum by (consumergroup) (kafka_consumergroup_lag_sum)
+```
+
+#### Liczba wywołań endpointu zamówień:
+```promql
+sum(
+    http_server_requests_seconds_count{
+    uri="/api/orders"
+    }
+)
+```
+#### Metryki na dashboardzie Grafany
+
+| Panel | Co pokazuje |
+|---|---|
+| Stan mikroserwisów | Czy `order-service` i `notification-service` odpowiadają na scrape Prometheusa (`UP` / `DOWN`). |
+| Dostępność eksportera Kafka | Czy `kafka-exporter` jest dostępny i dostarcza metryki klastra Kafka. |
+| Liczba brokerów | Liczbę brokerów wykrytych w klastrze Kafka. |
+| Żądania HTTP na sekundę | Tempo obsługi żądań HTTP przez mikroserwisy, rozdzielone według aplikacji i URI. |
+| Czas odpowiedzi HTTP (p95) | Czas odpowiedzi, poniżej którego mieści się 95% żądań; wzrost wartości oznacza wolniejsze odpowiedzi. |
+| Liczba partycji  | Łączną liczbę partycji topiców Kafka. |
+| Wiadomości w topicach  | Przybliżoną liczbę dostępnych wiadomości w topicach, z pominięciem topiców systemowych. |
+| Pamięć JVM | Zużycie pamięci heap JVM przez każdy mikroserwis. |
+| Consumer lag | Liczbę wiadomości oczekujących na odczyt przez każdą grupę konsumentów; wzrost może oznaczać opóźnienie konsumenta. |
+| Replikacja i ISR | Liczbę replik partycji oraz replik aktualnie zsynchronizowanych (ISR). |
+
 ---
 
 ## 5. Kod do wklejania (live coding)
