@@ -12,9 +12,5 @@ public class AnalyticsListener {
         this.orderMapper = orderMapper;
     }
 
-    @KafkaListener(topics = "orders-topic", groupId = "analytics-group")
-    public void consumeOrder(OrderDto orderDto) {
-        OrderEvent orderEvent = orderMapper.toDomain(orderDto);
-        System.out.println("[analytics] Zamówienie: " + orderEvent.getProductName() + " kwota=" + orderEvent.getPrice());
-    }
+//    Kakfa lisiner
 }

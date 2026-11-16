@@ -7,9 +7,9 @@ public class OrderMapper {
 
     public OrderEvent toDomain(OrderDto dto) {
         OrderEvent event = new OrderEvent();
-        event.setOrderId(dto.getOrderId());
-        event.setProductName(dto.getProductName());
-        event.setPrice(dto.getPrice());
+        event.setOrderId(dto.orderId());
+        event.setProductName(dto.productName());
+        event.setPrice(dto.price());
         event.setSchemaVersion(1);
         return event;
     }

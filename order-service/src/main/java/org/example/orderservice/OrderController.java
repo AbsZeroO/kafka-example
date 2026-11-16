@@ -28,21 +28,6 @@ public class OrderController {
     @PostMapping
     @Transactional
     public ResponseEntity<?> placeOrder(@RequestBody OrderDto orderDto) {
-        if (orderDto.getOrderId() == null) {
-            orderDto.setOrderId(UUID.randomUUID().toString());
-        }
 
-        OrderEvent orderEvent = orderMapper.toDomain(orderDto);
-
-        String correlationId = UUID.randomUUID().toString();
-        ProducerRecord<String, OrderDto> record =
-                new ProducerRecord<>("orders-topic", orderDto.getOrderId(), orderDto);
-        record.headers().add("X-Correlation-Id", correlationId.getBytes());
-
-        System.out.println("Otrzymano żądanie HTTP. Przetwarzanie zamówienia: " + orderEvent.getProductName());
-        kafkaTemplate.send(record);
-
-        return ResponseEntity.ok()
-                .body("Zamówienie " + orderDto.getOrderId() + " przekazane do Kafki!");
     }
 }
